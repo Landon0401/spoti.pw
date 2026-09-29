@@ -118,3 +118,11 @@ void SGRPlayerLyricsChanged(void);
 // Alpha 0, no touches, hidden from accessibility, set again on every call: for Spotify's Swift views,
 // which SGRSuppress cannot keep (PlayerControls.x).
 void SGRPlayerVanish(UIView *view);
+
+// Spotify's other player modes (the DJ's) build their units as classes of their own that no %hook
+// names. This finds every unit class whose name `match` accepts, other than the known ones and their
+// subclasses, and runs `after` on each unit's controller after its -viewDidLayoutSubviews, the same
+// way the hooks on the known units do. Run again later for frameworks that load late; a class is only
+// ever hooked once (PlayerControls.x).
+void SGRPlayerHookUnits(NSArray<NSString *> *known, BOOL (^match)(NSString *name), void (^after)(UIViewController *unit));
+
