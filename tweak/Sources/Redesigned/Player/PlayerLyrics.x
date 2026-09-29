@@ -821,6 +821,28 @@ static SGRPlayerLyricsWatcher *sg_watcher;
 %ctor {
     if (!SGRedesignedUI()) return;
     %init;
+    // The DJ's player has units of its own for the header, title, time and floating chips; the lines are
+    // laid out from them like any other mode's, so they are found by name too (PlayerControls.x).
+    NSArray<NSString *> *known = @[
+        @"_TtC20NowPlaying_ModesImpl18HeaderElementsUnit", @"_TtC20NowPlaying_ModesImpl23InformationElementsUnit",
+        @"_TtC20NowPlaying_ModesImpl19DurationElementUnit", @"_TtC20NowPlaying_ModesImpl20FloatingElementsUnit",
+        @"_TtC32ReinventFree_ReinventFreeNpvImpl43ReinventFreeNavigationBarUnitViewController",
+        @"_TtC32ReinventFree_ReinventFreeNpvImpl35ReinventFreeInformationElementsUnit",
+        @"_TtC32ReinventFree_ReinventFreeNpvImpl20DurationElementsUnit",
+    ];
+    void (^discover)(void) = ^{
+        SGRPlayerHookUnits(known, ^BOOL(NSString *n) { return [n containsString:@"Unit"] && ([n containsString:@"HeaderElements"] || [n containsString:@"NavigationBarUnit"]); },
+                           ^(UIViewController *unit) { headerLaidOut(unit); });
+        SGRPlayerHookUnits(known, ^BOOL(NSString *n) { return [n containsString:@"Unit"] && [n containsString:@"InformationElement"]; },
+                           ^(UIViewController *unit) { infoLaidOut(unit); });
+        SGRPlayerHookUnits(known, ^BOOL(NSString *n) { return [n containsString:@"Unit"] && [n containsString:@"DurationElement"]; },
+                           ^(UIViewController *unit) { durationLaidOut(unit); });
+        SGRPlayerHookUnits(known, ^BOOL(NSString *n) { return [n containsString:@"Unit"] && [n containsString:@"FloatingElements"]; },
+                           ^(UIViewController *unit) { sg_floating = unit; replace(); });
+    };
+    dispatch_async(dispatch_get_main_queue(), discover);
+    [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidBecomeActiveNotification object:nil
+                                                     queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) { discover(); }];
     sg_watcher = [SGRPlayerLyricsWatcher new];
     SGAddPlayerStateObserver(sg_watcher);
     [NSNotificationCenter.defaultCenter addObserverForName:SGKaraokeLinesDidChangeNotification object:nil queue:nil usingBlock:^(NSNotification *note) {

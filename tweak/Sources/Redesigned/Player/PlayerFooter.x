@@ -250,5 +250,15 @@ static void layOutFooter(UIViewController *unit) {
 %ctor {
     if (!SGRedesignedUI()) return;
     %init;
+    // The DJ's player (and any other mode) has a footer unit of its own, which is where its lyrics glyph
+    // was missing from. Found by name, now and again once the app is up, since some frameworks load late.
+    void (^discover)(void) = ^{
+        SGRPlayerHookUnits(@[@"_TtC20NowPlaying_ModesImpl18FooterElementsUnit", @"_TtC32ReinventFree_ReinventFreeNpvImpl30ReinventFreeFooterElementsUnit"],
+                           ^BOOL(NSString *name) { return [name containsString:@"Footer"] && [name containsString:@"Unit"]; },
+                           ^(UIViewController *unit) { layOutFooter(unit); });
+    };
+    dispatch_async(dispatch_get_main_queue(), discover);
+    [NSNotificationCenter.defaultCenter addObserverForName:UIApplicationDidBecomeActiveNotification object:nil
+                                                     queue:NSOperationQueue.mainQueue usingBlock:^(NSNotification *note) { discover(); }];
     SGRequireClasses(@[@"_TtC20NowPlaying_ModesImpl18FooterElementsUnit", @"_TtC32ReinventFree_ReinventFreeNpvImpl30ReinventFreeFooterElementsUnit"]);
 }

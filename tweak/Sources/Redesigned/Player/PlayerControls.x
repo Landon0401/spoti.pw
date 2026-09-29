@@ -46,6 +46,40 @@ void SGRPlayerVanish(UIView *view) {
     view.accessibilityElementsHidden = YES;
 }
 
+void SGRPlayerHookUnits(NSArray<NSString *> *known, BOOL (^match)(NSString *name), void (^after)(UIViewController *unit)) {
+    static NSMutableSet<NSString *> *hooked;
+    if (!hooked) hooked = [NSMutableSet set];
+    NSMutableArray<Class> *knownClasses = [NSMutableArray array];
+    for (NSString *name in known) {
+        Class c = NSClassFromString(name);
+        if (c) [knownClasses addObject:c];
+    }
+    unsigned int count = 0;
+    Class *all = objc_copyClassList(&count);
+    SEL layout = @selector(viewDidLayoutSubviews);
+    for (unsigned int i = 0; i < count; i++) {
+        Class cls = all[i];
+        const char *raw = class_getName(cls);
+        if (strncmp(raw, "_TtC", 4) != 0) continue;
+        NSString *name = @(raw);
+        if ([hooked containsObject:name] || !match(name) || ![cls isSubclassOfClass:UIViewController.class]) continue;
+        BOOL isKnown = NO;
+        for (Class k in knownClasses) if ([cls isSubclassOfClass:k]) { isKnown = YES; break; }
+        if (isKnown) continue;
+        Method method = class_getInstanceMethod(cls, layout);
+        if (!method) continue;
+        IMP original = method_getImplementation(method);
+        IMP replacement = imp_implementationWithBlock(^(UIViewController *unit) {
+            ((void (*)(id, SEL))original)(unit, layout);
+            after(unit);
+        });
+        if (!class_addMethod(cls, layout, replacement, method_getTypeEncoding(method))) method_setImplementation(method, replacement);
+        [hooked addObject:name];
+        SGLog(@"redesign player: hooked %@ as a player unit", name);
+    }
+    free(all);
+}
+
 static void logMissing(NSString *what) {
     static NSMutableSet<NSString *> *logged;
     if (!logged) logged = [NSMutableSet set];
